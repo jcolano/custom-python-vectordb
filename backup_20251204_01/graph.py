@@ -344,150 +344,6 @@ class EdgeTypeIndex:
         return idx
 
 
-class PropertyIndex:
-    """
-    Index for fast property-based lookups.
-
-    Inspired by RuVector's PropertyIndex pattern for O(1) property queries.
-    Maps property_key -> property_value -> set of node IDs.
-    """
-
-    def __init__(self):
-        # property_key -> {property_value -> set of node_ids}
-        self._index: dict[str, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
-
-    def add(self, node: Node):
-        """Index all properties of a node."""
-        for key, value in node.properties.items():
-            # Convert value to string for consistent indexing
-            str_value = str(value)
-            self._index[key][str_value].add(node.id)
-
-    def remove(self, node: Node):
-        """Remove node from all property indexes."""
-        for key, value in node.properties.items():
-            str_value = str(value)
-            if key in self._index and str_value in self._index[key]:
-                self._index[key][str_value].discard(node.id)
-                # Clean up empty entries
-                if not self._index[key][str_value]:
-                    del self._index[key][str_value]
-                if not self._index[key]:
-                    del self._index[key]
-
-    def get_by_property(self, key: str, value: any) -> set[str]:
-        """Get all node IDs with a specific property value. O(1) lookup."""
-        str_value = str(value)
-        if key in self._index and str_value in self._index[key]:
-            return self._index[key][str_value].copy()
-        return set()
-
-    def get_by_property_range(self, key: str, min_val: float = None,
-                               max_val: float = None) -> set[str]:
-        """Get nodes with numeric property in range. O(k) where k = unique values."""
-        if key not in self._index:
-            return set()
-
-        result = set()
-        for str_val, node_ids in self._index[key].items():
-            try:
-                num_val = float(str_val)
-                if min_val is not None and num_val < min_val:
-                    continue
-                if max_val is not None and num_val > max_val:
-                    continue
-                result.update(node_ids)
-            except (ValueError, TypeError):
-                continue
-        return result
-
-    def get_keys(self) -> list[str]:
-        """Get all indexed property keys."""
-        return list(self._index.keys())
-
-    def get_values(self, key: str) -> list[str]:
-        """Get all unique values for a property key."""
-        if key in self._index:
-            return list(self._index[key].keys())
-        return []
-
-    def to_dict(self) -> dict:
-        return {
-            key: {val: list(ids) for val, ids in values.items()}
-            for key, values in self._index.items()
-        }
-
-    @classmethod
-    def from_dict(cls, data: dict) -> 'PropertyIndex':
-        idx = cls()
-        for key, values in data.items():
-            for val, node_ids in values.items():
-                idx._index[key][val] = set(node_ids)
-        return idx
-
-
-class HyperedgeNodeIndex:
-    """
-    Index for fast node-to-hyperedge lookups.
-
-    Inspired by RuVector's HyperedgeNodeIndex for O(1) queries like
-    "find all hyperedges containing node X".
-    """
-
-    def __init__(self):
-        # node_id -> set of hyperedge_ids
-        self._node_to_hyperedges: dict[str, set[str]] = defaultdict(set)
-
-    def add(self, hyperedge: Hyperedge):
-        """Index a hyperedge for all its member nodes."""
-        for node_id in hyperedge.nodes:
-            self._node_to_hyperedges[node_id].add(hyperedge.id)
-
-    def remove(self, hyperedge: Hyperedge):
-        """Remove hyperedge from index."""
-        for node_id in hyperedge.nodes:
-            self._node_to_hyperedges[node_id].discard(hyperedge.id)
-            if not self._node_to_hyperedges[node_id]:
-                del self._node_to_hyperedges[node_id]
-
-    def get_by_node(self, node_id: str) -> set[str]:
-        """Get all hyperedge IDs containing a node. O(1) lookup."""
-        return self._node_to_hyperedges.get(node_id, set()).copy()
-
-    def get_by_nodes(self, node_ids: list[str], mode: str = "any") -> set[str]:
-        """
-        Get hyperedges by multiple nodes.
-
-        Args:
-            node_ids: List of node IDs
-            mode: "any" = hyperedges containing ANY of the nodes
-                  "all" = hyperedges containing ALL of the nodes
-        """
-        if not node_ids:
-            return set()
-
-        if mode == "any":
-            result = set()
-            for node_id in node_ids:
-                result.update(self._node_to_hyperedges.get(node_id, set()))
-            return result
-        else:  # mode == "all"
-            result = self._node_to_hyperedges.get(node_ids[0], set()).copy()
-            for node_id in node_ids[1:]:
-                result &= self._node_to_hyperedges.get(node_id, set())
-            return result
-
-    def to_dict(self) -> dict:
-        return {k: list(v) for k, v in self._node_to_hyperedges.items()}
-
-    @classmethod
-    def from_dict(cls, data: dict) -> 'HyperedgeNodeIndex':
-        idx = cls()
-        for node_id, hyperedge_ids in data.items():
-            idx._node_to_hyperedges[node_id] = set(hyperedge_ids)
-        return idx
-
-
 # =============================================================================
 # Graph Database
 # =============================================================================
@@ -500,12 +356,7 @@ class GraphDB:
     - Nodes with labels and properties
     - Directed edges (relationships) with types and properties
     - Hyperedges (connecting 3+ nodes)
-    - Multi-index architecture (RuVector-inspired):
-      * LabelIndex: O(1) label-based lookups
-      * PropertyIndex: O(1) property-based lookups
-      * AdjacencyIndex: O(1) neighbor lookups
-      * EdgeTypeIndex: O(1) edge type lookups
-      * HyperedgeNodeIndex: O(1) node-to-hyperedge lookups
+    - Label, adjacency, and edge type indexes
     - Simple Cypher-like query support
     - JSON persistence
     """
@@ -522,12 +373,10 @@ class GraphDB:
         self._edges: dict[str, Edge] = {}
         self._hyperedges: dict[str, Hyperedge] = {}
 
-        # Multi-Index Architecture (RuVector-inspired)
+        # Indexes
         self._label_index = LabelIndex()
-        self._property_index = PropertyIndex()  # NEW: Fast property queries
         self._adjacency_index = AdjacencyIndex()
         self._edge_type_index = EdgeTypeIndex()
-        self._hyperedge_node_index = HyperedgeNodeIndex()  # NEW: Fast hyperedge lookups
 
         # Load from disk
         if self._path:
@@ -546,12 +395,11 @@ class GraphDB:
         with open(data_path, "r") as f:
             data = json.load(f)
 
-        # Load nodes and rebuild indexes
+        # Load nodes
         for node_data in data.get("nodes", []):
             node = Node.from_dict(node_data)
             self._nodes[node.id] = node
             self._label_index.add(node)
-            self._property_index.add(node)  # NEW: Index properties
 
         # Load edges
         for edge_data in data.get("edges", []):
@@ -564,7 +412,6 @@ class GraphDB:
         for he_data in data.get("hyperedges", []):
             he = Hyperedge.from_dict(he_data)
             self._hyperedges[he.id] = he
-            self._hyperedge_node_index.add(he)  # NEW: Index hyperedge membership
 
     def save(self):
         """Save graph to disk."""
@@ -593,7 +440,6 @@ class GraphDB:
 
             self._nodes[node.id] = node
             self._label_index.add(node)
-            self._property_index.add(node)  # NEW: Index properties
             return node.id
 
     def get_node(self, node_id: str) -> Optional[Node]:
@@ -615,10 +461,7 @@ class GraphDB:
                 self._label_index.add(node)
 
             if properties is not None:
-                # Update property index - remove old, add new
-                self._property_index.remove(node)
                 node.properties.update(properties)
-                self._property_index.add(node)
 
             return True
 
@@ -644,14 +487,8 @@ class GraphDB:
             for edge_id in connected_edges:
                 self.delete_edge(edge_id)
 
-            # Delete connected hyperedges (NEW)
-            connected_hyperedges = self._hyperedge_node_index.get_by_node(node_id)
-            for he_id in connected_hyperedges:
-                self.delete_hyperedge(he_id)
-
             # Remove from indexes
             self._label_index.remove(node)
-            self._property_index.remove(node)  # NEW: Remove from property index
 
             # Delete node
             del self._nodes[node_id]
@@ -663,43 +500,19 @@ class GraphDB:
         return [self._nodes[nid] for nid in node_ids if nid in self._nodes]
 
     def find_nodes(self, label: str = None, properties: dict = None) -> list[Node]:
-        """
-        Find nodes by label and/or properties.
-
-        Uses PropertyIndex for O(1) property lookups when possible.
-        """
-        # Start with candidates based on label
+        """Find nodes by label and/or properties."""
         if label:
-            candidate_ids = self._label_index.get_by_label(label)
+            candidates = self.get_nodes_by_label(label)
         else:
-            candidate_ids = set(self._nodes.keys())
+            candidates = list(self._nodes.values())
 
-        # Use PropertyIndex for efficient filtering (RuVector pattern)
         if properties:
-            for key, value in properties.items():
-                matching_ids = self._property_index.get_by_property(key, value)
-                candidate_ids &= matching_ids
-                # Early exit if no matches
-                if not candidate_ids:
-                    return []
+            candidates = [
+                n for n in candidates
+                if all(n.properties.get(k) == v for k, v in properties.items())
+            ]
 
-        return [self._nodes[nid] for nid in candidate_ids if nid in self._nodes]
-
-    def find_nodes_by_property_range(self, key: str, min_val: float = None,
-                                      max_val: float = None,
-                                      label: str = None) -> list[Node]:
-        """
-        Find nodes with numeric property in range.
-
-        NEW: RuVector-inspired range query using PropertyIndex.
-        """
-        candidate_ids = self._property_index.get_by_property_range(key, min_val, max_val)
-
-        if label:
-            label_ids = self._label_index.get_by_label(label)
-            candidate_ids &= label_ids
-
-        return [self._nodes[nid] for nid in candidate_ids if nid in self._nodes]
+        return candidates
 
     # -------------------------------------------------------------------------
     # Edge Operations
@@ -774,7 +587,6 @@ class GraphDB:
                     raise ValueError(f"Node '{node_id}' not found")
 
             self._hyperedges[hyperedge.id] = hyperedge
-            self._hyperedge_node_index.add(hyperedge)  # NEW: Index for fast lookups
             return hyperedge.id
 
     def get_hyperedge(self, hyperedge_id: str) -> Optional[Hyperedge]:
@@ -785,31 +597,13 @@ class GraphDB:
         """Delete a hyperedge."""
         with self._lock:
             if hyperedge_id in self._hyperedges:
-                hyperedge = self._hyperedges[hyperedge_id]
-                self._hyperedge_node_index.remove(hyperedge)  # NEW: Remove from index
                 del self._hyperedges[hyperedge_id]
                 return True
             return False
 
     def get_hyperedges_by_node(self, node_id: str) -> list[Hyperedge]:
-        """Get all hyperedges containing a node. O(1) lookup via index."""
-        # NEW: Use HyperedgeNodeIndex for O(1) lookup instead of O(n) scan
-        hyperedge_ids = self._hyperedge_node_index.get_by_node(node_id)
-        return [self._hyperedges[hid] for hid in hyperedge_ids if hid in self._hyperedges]
-
-    def get_hyperedges_by_nodes(self, node_ids: list[str], mode: str = "any") -> list[Hyperedge]:
-        """
-        Get hyperedges by multiple nodes.
-
-        NEW: RuVector-inspired method for complex hyperedge queries.
-
-        Args:
-            node_ids: List of node IDs
-            mode: "any" = hyperedges containing ANY of the nodes
-                  "all" = hyperedges containing ALL of the nodes
-        """
-        hyperedge_ids = self._hyperedge_node_index.get_by_nodes(node_ids, mode)
-        return [self._hyperedges[hid] for hid in hyperedge_ids if hid in self._hyperedges]
+        """Get all hyperedges containing a node."""
+        return [h for h in self._hyperedges.values() if node_id in h.nodes]
 
     # -------------------------------------------------------------------------
     # Traversal
@@ -921,8 +715,7 @@ class GraphDB:
             "edges": self.edge_count(),
             "hyperedges": self.hyperedge_count(),
             "labels": list(self._label_index._label_to_nodes.keys()),
-            "edge_types": list(self._edge_type_index._type_to_edges.keys()),
-            "indexed_properties": self._property_index.get_keys(),  # NEW
+            "edge_types": list(self._edge_type_index._type_to_edges.keys())
         }
 
 
