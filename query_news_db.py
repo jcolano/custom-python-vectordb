@@ -458,24 +458,44 @@ class NewsQueryInterface:
             print("  No results found.")
             return
 
+        # Store last results for quick access
+        self._last_results = results
+
         for i, r in enumerate(results, 1):
             if hasattr(r, 'metadata'):
                 # SearchResult object
-                headline = r.metadata.get('headline', 'N/A')[:70]
+                article_id = r.id
+                headline = r.metadata.get('headline', 'N/A')[:60]
                 category = r.metadata.get('category', 'N/A')
                 source = r.metadata.get('source', 'N/A')
                 sentiment = r.metadata.get('sentiment', 'N/A')
                 score = f"{r.score:.4f}"
                 print(f"\n  {i}. [{score}] {headline}...")
+                print(f"     ID: {article_id}")
                 print(f"     Category: {category} | Source: {source} | Sentiment: {sentiment}")
             elif isinstance(r, dict):
                 # Dictionary result
-                headline = r.get('headline', 'N/A')[:70] if r.get('headline') else 'N/A'
+                article_id = r.get('id', 'N/A')
+                headline = r.get('headline', 'N/A')[:60] if r.get('headline') else 'N/A'
                 print(f"\n  {i}. {headline}...")
+                print(f"     ID: {article_id}")
                 if 'category' in r:
                     print(f"     Category: {r.get('category')} | Source: {r.get('source', 'N/A')}")
 
+        print(f"\n  TIP: Use 'read <ID>' or 'read {len(results)}' to read an article")
         print()
+
+    def get_result_by_number(self, number: int):
+        """Get article ID from last search results by number."""
+        if not hasattr(self, '_last_results') or not self._last_results:
+            return None
+        if 1 <= number <= len(self._last_results):
+            result = self._last_results[number - 1]
+            if hasattr(result, 'id'):
+                return result.id
+            elif isinstance(result, dict):
+                return result.get('id')
+        return None
 
     def print_entity_info(self, info: dict):
         """Pretty print entity information."""
@@ -518,7 +538,7 @@ def interactive_mode(query_interface: NewsQueryInterface):
     print("""
 Commands:
   search <query>         - Semantic search for articles
-  read <article_id>      - Read a full article
+  read <id or number>    - Read a full article (by ID or result #)
   entity <name>          - Look up an entity (company, person)
   topic <name>           - Find articles about a topic
   source <name>          - Find articles from a source
@@ -530,11 +550,11 @@ Commands:
 
 Examples:
   search artificial intelligence
-  read article_00000001
+  read 3                              <- read 3rd result from search
+  read article_00000001               <- read by ID
   entity Apple
   topic climate change
   source TechCrunch
-  category technology
     """)
 
     while True:
@@ -557,10 +577,24 @@ Examples:
 
             elif command == "read":
                 if not args:
-                    print("Usage: read <article_id>")
-                    print("Example: read article_00000001")
+                    print("Usage: read <article_id> or read <number>")
+                    print("Examples:")
+                    print("  read article_00000001")
+                    print("  read 3  (reads 3rd result from last search)")
                     continue
-                article = query_interface.read_article(args)
+
+                # Check if it's a number (read from last results)
+                try:
+                    result_num = int(args)
+                    article_id = query_interface.get_result_by_number(result_num)
+                    if not article_id:
+                        print(f"  No result #{result_num} in last search. Run a search first.")
+                        continue
+                except ValueError:
+                    # It's an article ID
+                    article_id = args
+
+                article = query_interface.read_article(article_id)
                 query_interface.print_article(article)
 
             elif command == "search":
