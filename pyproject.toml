@@ -3,14 +3,14 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "pyvectordb"
+name = "fastpydb"
 version = "0.1.0"
 description = "A high-performance Python vector database for semantic search and RAG applications"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.10"
 authors = [
-    {name = "PyVectorDB Contributors"}
+    {name = "FastPyDB Contributors"}
 ]
 keywords = [
     "vector-database",
@@ -109,15 +109,15 @@ Repository = "https://github.com/jcolano/custom-python-vectordb"
 Issues = "https://github.com/jcolano/custom-python-vectordb/issues"
 
 [project.scripts]
-pyvectordb-server = "server:main"
+fastpydb-server = "server:main"
 
 [tool.setuptools]
-packages = ["pyvectordb"]
+packages = ["fastpydb"]
 package-dir = {"" = "."}
 include-package-data = true
 
 [tool.setuptools.package-data]
-pyvectordb = ["py.typed"]
+fastpydb = ["py.typed"]
 
 [tool.black]
 line-length = 100
