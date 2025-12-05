@@ -7,7 +7,6 @@ name = "fastpydb"
 version = "0.1.0"
 description = "A high-performance Python vector database for semantic search and RAG applications"
 readme = "README.md"
-license = "MIT"
 requires-python = ">=3.10"
 authors = [
     {name = "FastPyDB Contributors"}
@@ -28,6 +27,7 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
