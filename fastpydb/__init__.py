@@ -1,15 +1,15 @@
 """
-PyVectorDB - A High-Performance Python Vector Database
+FastPyDB - A High-Performance Python Vector Database
 
 A feature-rich, easy-to-use vector database for semantic search, RAG applications,
 and embedding-based retrieval. Similar to ChromaDB but with additional features
 like graph support, hybrid search, and quantization.
 
 Quick Start:
-    import pyvectordb
+    import fastpydb
 
     # Create a client
-    client = pyvectordb.Client()
+    client = fastpydb.Client()
 
     # Create a collection (uses local embedding model by default)
     collection = client.create_collection("my_docs")
@@ -36,10 +36,10 @@ Features:
 """
 
 __version__ = "0.1.0"
-__author__ = "PyVectorDB Contributors"
+__author__ = "FastPyDB Contributors"
 
 # Main client API
-from pyvectordb.client import Client, Collection, QueryResult, GetResult
+from fastpydb.client import Client, Collection, QueryResult, GetResult
 
 # Re-export commonly used items from core modules
 import sys as _sys
@@ -112,7 +112,7 @@ def create_client(
     embedding_provider: str = "auto"
 ) -> Client:
     """
-    Convenience function to create a PyVectorDB client.
+    Convenience function to create a FastPyDB client.
 
     Args:
         path: Directory to store database files
@@ -123,7 +123,7 @@ def create_client(
         Client instance
 
     Example:
-        client = pyvectordb.create_client("./my_data")
+        client = fastpydb.create_client("./my_data")
     """
     return Client(
         path=path,

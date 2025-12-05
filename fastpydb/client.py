@@ -1,13 +1,13 @@
 """
-PyVectorDB - High-Level Client API
+FastPyDB - High-Level Client API
 
-A simple, ChromaDB-like interface for the PyVectorDB vector database.
+A simple, ChromaDB-like interface for the FastPyDB vector database.
 
 Usage:
-    import pyvectordb
+    import fastpydb
 
     # Create a client
-    client = pyvectordb.Client()
+    client = fastpydb.Client()
 
     # Create a collection
     collection = client.create_collection("my_docs", embedding_model="all-MiniLM-L6-v2")
@@ -443,19 +443,19 @@ class Collection:
 
 class Client:
     """
-    PyVectorDB Client - Main entry point for the vector database.
+    FastPyDB Client - Main entry point for the vector database.
 
     Similar to ChromaDB's Client interface. Manages collections and
     provides a simple API for document storage and semantic search.
 
     Example:
-        import pyvectordb
+        import fastpydb
 
         # Create client (data stored in ./vectordb by default)
-        client = pyvectordb.Client()
+        client = fastpydb.Client()
 
         # Or specify a path
-        client = pyvectordb.Client(path="./my_data")
+        client = fastpydb.Client(path="./my_data")
 
         # Create a collection with auto-embedding
         collection = client.create_collection(
@@ -482,7 +482,7 @@ class Client:
         embedding_provider: str = "auto"
     ):
         """
-        Initialize the PyVectorDB client.
+        Initialize the FastPyDB client.
 
         Args:
             path: Directory to store database files

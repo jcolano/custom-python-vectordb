@@ -1,4 +1,4 @@
-# PyVectorDB
+# FastPyDB
 
 A high-performance Python vector database with a simple, ChromaDB-like API. Features HNSW indexing, multiple embedding providers, quantization, knowledge graphs, and more.
 
@@ -28,13 +28,13 @@ pip install numpy hnswlib sentence-transformers
 
 ## Quick Start
 
-PyVectorDB provides a simple, intuitive API similar to ChromaDB:
+FastPyDB provides a simple, intuitive API similar to ChromaDB:
 
 ```python
-import pyvectordb
+import fastpydb
 
 # Create a client
-client = pyvectordb.Client()
+client = fastpydb.Client()
 
 # Create a collection (uses local embeddings by default)
 collection = client.create_collection("my_documents")
@@ -70,10 +70,10 @@ for doc, score in zip(results.documents[0], results.distances[0]):
 ### Client Operations
 
 ```python
-import pyvectordb
+import fastpydb
 
 # Create client (data stored in ./vectordb by default)
-client = pyvectordb.Client(path="./my_data")
+client = fastpydb.Client(path="./my_data")
 
 # Create a new collection
 collection = client.create_collection("documents")
@@ -197,7 +197,7 @@ results = collection.query(
 )
 
 # Using Filter class for complex queries
-from pyvectordb import Filter
+from fastpydb import Filter
 
 results = collection.query(
     query_texts="search",
@@ -247,11 +247,11 @@ For advanced features like quantization, parallel search, and knowledge graphs, 
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                       PyVectorDB System                         │
+│                       FastPyDB System                         │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  ┌──────────────────┐    ┌──────────────────┐                  │
-│  │  pyvectordb/     │    │   quantization   │                  │
+│  │  fastpydb/     │    │   quantization   │                  │
 │  │  client.py       │    │      .py         │                  │
 │  │  ──────────────  │    │  ──────────────  │                  │
 │  │  • Client        │    │  • Scalar (4x)   │                  │
@@ -469,7 +469,7 @@ results = client.search("docs", vector=[0.1, 0.2, ...], k=10)
 
 | Module | Description |
 |--------|-------------|
-| `pyvectordb/` | High-level client API (recommended) |
+| `fastpydb/` | High-level client API (recommended) |
 | `vectordb_optimized.py` | Core vector database with HNSW indexing |
 | `quantization.py` | Scalar, binary, and product quantization |
 | `parallel_search.py` | Multi-core search engine and memory-mapped vectors |
@@ -483,7 +483,7 @@ results = client.search("docs", vector=[0.1, 0.2, ...], k=10)
 ### Filter Operations
 
 ```python
-from pyvectordb import Filter
+from fastpydb import Filter
 
 Filter.eq("field", value)       # Equal
 Filter.ne("field", value)       # Not equal
