@@ -176,6 +176,101 @@ class NewsQueryInterface:
         result = self.collection.get(article_id, include_vector=False)
         return result
 
+    def read_article(self, article_id: str) -> dict:
+        """
+        Read a full article by ID.
+
+        Args:
+            article_id: The article ID (e.g., "article_00000001")
+
+        Returns:
+            Dictionary with full article details
+        """
+        # Get from vector DB
+        result = self.collection.get(article_id, include_vector=False)
+
+        if not result:
+            return {"error": f"Article '{article_id}' not found"}
+
+        article = {
+            "id": article_id,
+            "headline": result.get("headline", "N/A"),
+            "content": result.get("content", "N/A"),
+            "category": result.get("category", "N/A"),
+            "topic": result.get("topic", "N/A"),
+            "source": result.get("source", "N/A"),
+            "published_date": result.get("published_date", "N/A"),
+            "sentiment": result.get("sentiment", "N/A"),
+            "word_count": result.get("word_count", 0),
+            "entities": result.get("entities", "").split(",") if result.get("entities") else [],
+            "related_topics": result.get("related_topics", "").split(",") if result.get("related_topics") else []
+        }
+
+        # Enrich with graph data if available
+        if self.graph:
+            node = self.graph.get_node(article_id)
+            if node:
+                # Get related entities from graph
+                entities = self.graph.neighbors(article_id, direction="out", edge_type="MENTIONS")
+                if entities:
+                    article["mentioned_entities"] = [
+                        {"name": e.properties.get("name"), "type": e.properties.get("type")}
+                        for e in entities
+                    ]
+
+                # Get source info
+                sources = self.graph.neighbors(article_id, direction="out", edge_type="PUBLISHED_BY")
+                if sources:
+                    article["publisher"] = sources[0].properties.get("name")
+
+                # Get topics from graph
+                topics = self.graph.neighbors(article_id, direction="out", edge_type="ABOUT")
+                if topics:
+                    article["topics_graph"] = [t.properties.get("name") for t in topics]
+
+        return article
+
+    def print_article(self, article: dict):
+        """Pretty print a full article."""
+        if "error" in article:
+            print(f"\n  Error: {article['error']}")
+            return
+
+        print(f"\n{'='*70}")
+        print(f" {article.get('headline', 'N/A')}")
+        print(f"{'='*70}")
+        print(f"\n  ID:        {article.get('id')}")
+        print(f"  Source:    {article.get('publisher') or article.get('source')}")
+        print(f"  Date:      {article.get('published_date')}")
+        print(f"  Category:  {article.get('category')}")
+        print(f"  Topic:     {article.get('topic')}")
+        print(f"  Sentiment: {article.get('sentiment')}")
+        print(f"  Words:     {article.get('word_count')}")
+
+        if article.get('mentioned_entities'):
+            print(f"\n  Entities Mentioned:")
+            for e in article['mentioned_entities'][:5]:
+                print(f"    - {e['name']} ({e['type']})")
+
+        if article.get('related_topics'):
+            print(f"\n  Related Topics: {', '.join(article['related_topics'][:5])}")
+
+        print(f"\n  Content:")
+        print(f"  {'-'*66}")
+        # Word wrap the content
+        content = article.get('content', 'N/A')
+        words = content.split()
+        line = "  "
+        for word in words:
+            if len(line) + len(word) > 68:
+                print(line)
+                line = "  " + word + " "
+            else:
+                line += word + " "
+        if line.strip():
+            print(line)
+        print()
+
     # =========================================================================
     # GRAPH-BASED QUERIES
     # =========================================================================
@@ -423,6 +518,7 @@ def interactive_mode(query_interface: NewsQueryInterface):
     print("""
 Commands:
   search <query>         - Semantic search for articles
+  read <article_id>      - Read a full article
   entity <name>          - Look up an entity (company, person)
   topic <name>           - Find articles about a topic
   source <name>          - Find articles from a source
@@ -434,6 +530,7 @@ Commands:
 
 Examples:
   search artificial intelligence
+  read article_00000001
   entity Apple
   topic climate change
   source TechCrunch
@@ -456,7 +553,15 @@ Examples:
                 break
 
             elif command == "help":
-                print("Commands: search, entity, topic, source, category, trending, stats, quit")
+                print("Commands: search, read, entity, topic, source, category, trending, stats, quit")
+
+            elif command == "read":
+                if not args:
+                    print("Usage: read <article_id>")
+                    print("Example: read article_00000001")
+                    continue
+                article = query_interface.read_article(args)
+                query_interface.print_article(article)
 
             elif command == "search":
                 if not args:
@@ -542,6 +647,8 @@ Examples:
                        help="Path to the database")
     parser.add_argument("--search", "-s", type=str,
                        help="Search for articles")
+    parser.add_argument("--read", "-r", type=str,
+                       help="Read a specific article by ID")
     parser.add_argument("--entity", "-e", type=str,
                        help="Look up an entity")
     parser.add_argument("--topic", "-t", type=str,
@@ -576,6 +683,10 @@ Examples:
                            category=args.category,
                            sentiment=args.sentiment)
         qi.print_results(results, f"Search: '{args.search}'")
+
+    elif args.read:
+        article = qi.read_article(args.read)
+        qi.print_article(article)
 
     elif args.entity:
         info = qi.find_entity(args.entity)
